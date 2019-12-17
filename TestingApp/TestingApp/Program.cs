@@ -12,19 +12,24 @@ namespace TestingApp
 {
     internal static class Program
     {
-        private static (string Error, IRestResponse Response) GetVacancies(string text)
+        private static (string Error, IRestResponse Response) GetVacancies(string text, uint applies = 1)
         {
             var client = new RestClient("https://api.hh.ru/");
 
-            var getRequest = new RestRequest("vacancies", Method.GET);
-            getRequest.AddUrlSegment("text", text);
+            var requestUri = "vacancies?";
+            var paramAppend = $"text={Uri.EscapeDataString(text)}&";
+
+            for (uint applied = 0; applied < applies; applied++)
+                requestUri += paramAppend;
+
+            var getRequest = new RestRequest(requestUri, Method.GET);
 
             var getResponse = client.Execute(getRequest);
 
             if (getResponse.IsSuccessful)
                 return (null, getResponse);
             else
-                return (getResponse.ErrorMessage, getResponse);
+                return (getResponse.StatusDescription, getResponse);
         }
 
         private static (string Error, List<Dictionary<string, object>> Vacancies) GetParsedVacancies(string request)
@@ -63,9 +68,26 @@ namespace TestingApp
             }
         }
 
+        private static string Test_MultipleTextApplies(uint applies, bool mustFail)
+        {
+            var (error, _) = GetVacancies("", applies);
+
+            bool failed = error != null;
+
+            return string.Format(
+                    "[{0}]: The property 'text' was applied {1} time(s). Error expected: {2}. Error: {3}",
+                    failed == mustFail ? "PASSED" : "FAILED",
+                    applies,
+                    mustFail ? "YES" : "NO",
+                    error ?? "<There was no error>"
+                );
+        }
+
         private static void Main()
         {
-            Test_JustShowNames("", "Full-Stack", "pornhub");
+            Console.WriteLine($"TEST #1 {Test_MultipleTextApplies(0, false)}");
+            Console.WriteLine($"TEST #2 {Test_MultipleTextApplies(1, false)}");
+            Console.WriteLine($"TEST #3 {Test_MultipleTextApplies(2, true)}");
 
             Console.ReadKey();
         }
