@@ -49,25 +49,6 @@ namespace TestingApp
                 return ("Содержимое ответа не содержит массив items.", null);
         }
 
-        private static
-            Dictionary<string, (string Error, List<Dictionary<string, object>> Vacancies)>
-            GetAllParsedVacancies(IList<string> texts)
-        {
-            var result = new Dictionary<string, (string Error, List<Dictionary<string, object>> Vacancies)>();
-            foreach (var text in texts) result.Add(text, GetParsedVacancies(text));
-
-            return result;
-        }
-
-        private static void Test_JustShowNames(params string[] texts)
-        {
-            var vacancies = GetAllParsedVacancies(texts);
-            foreach (var vacancy in vacancies)
-            {
-                Console.ReadKey();
-            }
-        }
-
         private static string Test_MultipleTextApplies(uint applies, bool mustFail)
         {
             var (error, _) = GetVacancies("", applies);
