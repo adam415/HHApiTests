@@ -32,9 +32,9 @@ namespace TestingApp
                 return (getResponse.StatusDescription, getResponse);
         }
 
-        private static (string Error, List<Dictionary<string, object>> Vacancies) GetParsedVacancies(string request)
+        private static (string Error, List<Dictionary<string, object>> Vacancies) GetParsedVacancies(string text)
         {
-            var (error, response) = GetVacancies(request);
+            var (error, response) = GetVacancies(text);
 
             if (error != null) return (error, null);
 
@@ -64,12 +64,86 @@ namespace TestingApp
                 );
         }
 
+        private static IEnumerable<string> Test_TextSize(int initial = 32400, int step = 2)
+        {
+            string text = new string('A', initial);
+            int length = initial;
+            const int limit = 32600 + 500;
+            while (length <= limit)
+            {
+                length += step; text += new string('A', step);
+
+                var (error, _) = GetVacancies(text);
+
+                yield return string.Format(
+                    "[{0}]: Requesting response attempt with 'text' length: {1}. Error: {2}",
+                    error == null ? "PASSED (partial)" : "FAIL (partial)",
+                    length,
+                    error ?? "<No Error>"
+                    );
+
+                if (error != null) break;
+            }
+            
+            yield return
+                length > limit ?
+                $"\r\n[ALL SUCCEEDED]: The response did not fail with 'text' length up until: {limit}." :
+                $"\r\n[LIMITED SUCCEDED]: The response failed with 'text' length {length}";
+        }
+
+        private static string Test_TextSizeV2()
+        {
+            int ignoredFrom = -1, failedFrom = -1;
+
+            string text = new string('A', 20);
+            const int step = 2, limit = 33_000; // 32600
+            
+            while (text.Length <= limit)
+            {
+                text += new string('A', step);
+
+                var (error, vacancies) = GetParsedVacancies(text);
+
+                if (ignoredFrom == -1 && error == null && vacancies.Count > 0)
+                    { ignoredFrom = text.Length; text = new string('A', 32400); }
+
+                if (error != null)
+                {
+                    failedFrom = text.Length;
+
+                    return string.Format(
+                        "[INFO]: Field 'text' got ignored from length {0}. Request failed from length {1} with error: {2}",
+                        ignoredFrom != -1 ? $"{ignoredFrom}" : "<Never ignored>",
+                        failedFrom,
+                        error
+                    );
+                }
+            }
+
+            return string.Format(
+                "[INFO]: Field 'text' got ignored from length {0}. Request did not fail with length up until {1}.",
+                ignoredFrom != -1 ? $"{ignoredFrom}" : "<Never ignored>",
+                limit
+            );
+        }
+
         private static void Main()
         {
-            Console.WriteLine($"TEST #1 {Test_MultipleTextApplies(0, false)}");
-            Console.WriteLine($"TEST #2 {Test_MultipleTextApplies(1, false)}");
-            Console.WriteLine($"TEST #3 {Test_MultipleTextApplies(2, true)}");
+            Console.WriteLine($"\r\n*** Поле text не может принимать несколько значений ***\r\n");
+            Console.WriteLine($"{Test_MultipleTextApplies(0, false)}");
+            Console.WriteLine($"{Test_MultipleTextApplies(1, false)}");
+            Console.WriteLine($"{Test_MultipleTextApplies(2, true)}");
+            Console.WriteLine($"\r\nНажмите любую клавишу, чтобы перейти к следующим тестам..\r\n");
+            Console.ReadKey();
 
+            Console.WriteLine($"\r\n*** Проверка на объем вводимых даннных в поле text ***\r\n");
+            foreach (var report in Test_TextSize()) Console.WriteLine($"{report}");
+            Console.WriteLine($"\r\nНажмите любую клавишу, чтобы перейти к следующим тестам..\r\n");
+            Console.ReadKey();
+
+            Console.WriteLine($"\r\n*** Проверка на объем вводимых даннных в поле text ***\r\n");
+            Console.WriteLine($"{Test_TextSizeV2()}");
+            Console.WriteLine($"\r\nНажмите любую клавишу, чтобы перейти к следующим тестам..\r\n");
             Console.ReadKey();
         }
     }
