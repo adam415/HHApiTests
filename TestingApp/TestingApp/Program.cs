@@ -16,7 +16,7 @@ namespace TestingApp
         {
             var client = new RestClient("https://api.hh.ru/");
 
-            var requestUri = "vacancies?";
+            var requestUri = "vacancies?no_magic=true&";
             var paramAppend = $"text={Uri.EscapeDataString(text)}&";
 
             for (uint applied = 0; applied < applies; applied++)
@@ -38,7 +38,8 @@ namespace TestingApp
 
             if (error != null) return (error, null);
 
-            var contentDictionary = JsonConvert.DeserializeObject<Dictionary<string, object>>(response.Content);
+            var contentDictionary = JsonConvert.DeserializeObject<Dictionary<string, object>>(response.Content)
+                ?? new Dictionary<string, object>();
 
             if (contentDictionary.ContainsKey("items") && contentDictionary["items"] is JArray itemsJArray)
             {
@@ -141,6 +142,100 @@ namespace TestingApp
             }
         }
 
+        private static readonly string[][] SetOfStrings = new string[][]
+        {
+            new[] { "Coca", "Cola" },
+            new[] { "PHP", "SQL" },
+            new[] { "Директор", "Руководитель" },
+            new[] { "Бухгалтер", "Cola", "Fanta", "Sprite", "KFC" },
+        };
+
+        private static bool VacancyContainsWord(this Dictionary<string, object> vacancy, string word)
+        {
+            var jsonedVacancy = JsonConvert.SerializeObject(vacancy);
+            return jsonedVacancy.ToLower().Contains(word.ToLower());
+        }
+
+        private static bool VacancyContainsAllWords(this Dictionary<string, object> vacancy, IEnumerable<string> words)
+        {
+            var jsonedVacancy = JsonConvert.SerializeObject(vacancy);
+            return words.All(word => jsonedVacancy.ToLower().Contains(word.ToLower()));
+        }
+
+        private static IEnumerable<string> Test_Content_OneExactWord(IEnumerable<string> set)
+        {
+            foreach (var word in set)
+            {
+                var (error, vacancies) = GetParsedVacancies($"!{word}");
+                int passed = vacancies.Count(vac => vac.VacancyContainsWord(word));
+
+                yield return string.Format(
+                        "[{0}]: Requested \"{1}\". Word was found in {2} out of {3}.",
+                        passed == vacancies.Count ? "PASSED" : "FAIL",
+                        word,
+                        passed,
+                        vacancies.Count
+                    );
+            }
+        }
+
+        private static IEnumerable<string> Test_Content_AndOperator(IEnumerable<string[]> set)
+        {
+            foreach (var words in set)
+            {
+                var (error, vacancies) = GetParsedVacancies($"(!{words[0]} AND !{words[1]}");
+                int passed = vacancies.Count(vac =>
+                    vac.VacancyContainsWord(words[0]) &&
+                    vac.VacancyContainsWord(words[1]));
+
+                yield return string.Format(
+                        "[{0}]: Requested \"{1}\". Words were found in {2} out of {3}.",
+                        passed == vacancies.Count ? "PASSED" : "FAIL",
+                        $"(!{words[0]} AND !{words[1]})",
+                        passed,
+                        vacancies.Count
+                    );
+            }
+        }
+
+        private static IEnumerable<string> Test_Content_OrOperator(IEnumerable<string[]> set)
+        {
+            foreach (var words in set)
+            {
+                var (error, vacancies) = GetParsedVacancies($"(!{words[0]} OR !{words[1]}");
+                int passed = vacancies.Count(vac =>
+                    vac.VacancyContainsWord(words[0]) ||
+                    vac.VacancyContainsWord(words[1]));
+
+                yield return string.Format(
+                        "[{0}]: Requested \"{1}\". Words were found in {2} out of {3}.",
+                        passed == vacancies.Count ? "PASSED" : "FAIL",
+                        $"(!{words[0]} OR !{words[1]})",
+                        passed,
+                        vacancies.Count
+                    );
+            }
+        }
+
+        private static IEnumerable<string> Test_Content_NotOperator(IEnumerable<string[]> set)
+        {
+            foreach (var words in set)
+            {
+                var (error, vacancies) = GetParsedVacancies($"(!{words[0]} NOT !{words[1]}");
+                int passed = vacancies.Count(vac =>
+                    vac.VacancyContainsWord(words[0]) &&
+                    !vac.VacancyContainsWord(words[1]));
+
+                yield return string.Format(
+                        "[{0}]: Requested \"{1}\". Words were found in {2} out of {3}.",
+                        passed == vacancies.Count ? "PASSED" : "FAIL",
+                        $"(!{words[0]} NOT !{words[1]})",
+                        passed,
+                        vacancies.Count
+                    );
+            }
+        }
+
         private static void Main()
         {
             Console.WriteLine($"\r\n*** Поле text не может принимать несколько значений ***\r\n");
@@ -163,6 +258,26 @@ namespace TestingApp
             Console.WriteLine($"\r\n*** Проверка безопасности. JS Injections ***\r\n");
             foreach (var report in Test_Critical()) Console.WriteLine(report);
             Console.WriteLine($"\r\nНажмите любую клавишу, чтобы перейти к следующим тестам..\r\n");
+            Console.ReadKey();
+
+            Console.WriteLine($"\r\n*** Проверка содержания точного слово в вакансии ***\r\n");
+            foreach (var report in Test_Content_OneExactWord(SetOfStrings.Last())) Console.WriteLine(report);
+            Console.WriteLine($"\r\nНажмите любую клавишу, чтобы перейти к следующим тестам..\r\n");
+            Console.ReadKey();
+
+            Console.WriteLine($"\r\n*** Проверка оператора AND ***\r\n");
+            foreach (var report in Test_Content_AndOperator(SetOfStrings)) Console.WriteLine(report);
+            Console.WriteLine($"\r\nНажмите любую клавишу, чтобы перейти к следующим тестам..\r\n");
+            Console.ReadKey();
+
+            Console.WriteLine($"\r\n*** Проверка оператора OR ***\r\n");
+            foreach (var report in Test_Content_OrOperator(SetOfStrings)) Console.WriteLine(report);
+            Console.WriteLine($"\r\nНажмите любую клавишу, чтобы перейти к следующим тестам..\r\n");
+            Console.ReadKey();
+
+            Console.WriteLine($"\r\n*** Проверка оператора NOT ***\r\n");
+            foreach (var report in Test_Content_NotOperator(SetOfStrings)) Console.WriteLine(report);
+            Console.WriteLine($"\r\nНажмите любую клавишу, чтобы ВЫЙТИ..\r\n");
             Console.ReadKey();
         }
     }
