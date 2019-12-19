@@ -127,6 +127,20 @@ namespace TestingApp
             );
         }
 
+        private static IEnumerable<string> Test_Critical()
+        {
+            IEnumerable<string> requests = new List<string>
+            {
+                "I like this site because <script>alert('Injected!');</script> teaches me a lot"
+            };
+
+            foreach (var req in requests)
+            {
+                var (err, vac) = GetVacancies(req);
+                yield return "[INFO] Cannot test JS injections while black-box testing.";
+            }
+        }
+
         private static void Main()
         {
             Console.WriteLine($"\r\n*** Поле text не может принимать несколько значений ***\r\n");
@@ -143,6 +157,11 @@ namespace TestingApp
 
             Console.WriteLine($"\r\n*** Проверка на объем вводимых даннных в поле text ***\r\n");
             Console.WriteLine($"{Test_TextSizeV2()}");
+            Console.WriteLine($"\r\nНажмите любую клавишу, чтобы перейти к следующим тестам..\r\n");
+            Console.ReadKey();
+
+            Console.WriteLine($"\r\n*** Проверка безопасности. JS Injections ***\r\n");
+            foreach (var report in Test_Critical()) Console.WriteLine(report);
             Console.WriteLine($"\r\nНажмите любую клавишу, чтобы перейти к следующим тестам..\r\n");
             Console.ReadKey();
         }
